@@ -1,0 +1,34 @@
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# --- Sozlamalar ---
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# --- Gemini rasmiy SDK ---
+google-genai==1.2.0
+
+# --- Fayl konvertatsiya ---
+pdf2docx==0.5.8
+python-docx==1.1.2
+pypdf==5.1.0
+pypdfium2==4.30.1
+img2pdf==0.5.1
+Pillow==11.1.0
+
+# --- Til aniqlash ---
+langdetect==1.0.9
+
+# --- Fon vazifalari / navbat ---
+celery==5.4.0
+redis==5.2.1
+
+# --- Testlash ---
+pytest==8.3.4
+pytest-asyncio==0.25.2
+pytest-mock==3.14.0
+
+# --- Yordamchi ---
+python-dotenv==1.0.1
