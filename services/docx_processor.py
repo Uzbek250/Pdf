@@ -32,7 +32,7 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
-from app.services.translator import TranslatorService
+from .services.translator import TranslatorService
 
 logger = logging.getLogger(__name__)
 

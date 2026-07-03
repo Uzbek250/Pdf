@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import pytest
 
-from app.config.settings import Settings
+from .config.settings import Settings
 
 
 @pytest.fixture

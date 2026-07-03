@@ -7,7 +7,7 @@ import hashlib
 
 import pytest
 
-from app.cache.translation_cache import (
+from .cache.translation_cache import (
     LRUMemoryCache,
     build_cache_key,
     normalize_text,

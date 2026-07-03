@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from docx import Document
 
-from app.services.docx_processor import (
+from .services.docx_processor import (
     _collect_translatable_paragraphs,
     _distribute_translation_to_runs,
 )

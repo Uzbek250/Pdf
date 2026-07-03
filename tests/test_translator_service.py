@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import pytest
 
-from app.cache.translation_cache import TranslationCache
-from app.providers.base import (
+from .cache.translation_cache import TranslationCache
+from .providers.base import (
     LanguageDetectionResult,
     TranslationProvider,
     TranslationResult,
 )
-from app.services.translator import TranslatorService
+from .services.translator import TranslatorService
 
 
 class FakeProvider(TranslationProvider):

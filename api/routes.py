@@ -14,10 +14,10 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.config.languages import DEFAULT_TARGET_LANGUAGE, is_supported, list_languages
-from app.config.settings import get_settings
-from app.services.translator import get_translator_service
-from app.workers.celery_tasks import read_progress, translate_document_task
+from .config.languages import DEFAULT_TARGET_LANGUAGE, is_supported, list_languages
+from .config.settings import get_settings
+from .services.translator import get_translator_service
+from .workers.celery_tasks import read_progress, translate_document_task
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
