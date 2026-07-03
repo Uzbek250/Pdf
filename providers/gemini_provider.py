@@ -19,8 +19,8 @@ from google import genai
 from google.genai import types as genai_types
 from google.genai.errors import APIError, ClientError, ServerError
 
-from .config.settings import Settings, get_settings
-from .providers.base import (
+from config.settings import Settings, get_settings
+from providers.base import (
     LanguageDetectionResult,
     RateLimitError,
     TranslationProvider,
@@ -145,7 +145,7 @@ class GeminiProvider(TranslationProvider):
         if not texts:
             return TranslationResult(translations=[], source_language=source_language)
 
-        from .config.languages import get_language
+        from config.languages import get_language
 
         target_lang_name = get_language(target_language).name_en
         source_hint = (
@@ -276,7 +276,7 @@ class GeminiProvider(TranslationProvider):
         target_language: str,
         mime_type: str = "image/png",
     ) -> str:
-        from .config.languages import get_language
+        from config.languages import get_language
 
         target_lang_name = get_language(target_language).name_en
         prompt = _ocr_translate_prompt(target_lang_name)

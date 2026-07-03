@@ -30,8 +30,8 @@ from typing import Any
 
 from celery import Celery
 
-from .config.settings import get_settings
-from .services.converter import (
+from config.settings import get_settings
+from services.converter import (
     ConversionError,
     docx_to_pdf,
     images_to_pdf,
@@ -39,8 +39,8 @@ from .services.converter import (
     pdf_to_docx,
     render_pdf_pages_to_images,
 )
-from .services.docx_processor import translate_docx
-from .services.translator import get_translator_service
+from services.docx_processor import translate_docx
+from services.translator import get_translator_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

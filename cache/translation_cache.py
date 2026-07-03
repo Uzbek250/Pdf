@@ -25,7 +25,7 @@ try:
 except ImportError:  # redis kutubxonasi o'rnatilmagan bo'lishi mumkin (testlarda)
     redis_asyncio = None  # type: ignore[assignment]
 
-from .config.settings import Settings, get_settings
+from config.settings import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 

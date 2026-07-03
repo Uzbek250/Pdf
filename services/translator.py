@@ -9,11 +9,11 @@ import logging
 from langdetect import DetectorFactory, detect_langs
 from langdetect.lang_detect_exception import LangDetectException
 
-from .cache.translation_cache import TranslationCache, get_translation_cache
-from .config.languages import DEFAULT_TARGET_LANGUAGE, is_supported
-from .config.settings import Settings, get_settings
-from .providers.base import TranslationProvider
-from .providers.gemini_provider import GeminiProvider
+from cache.translation_cache import TranslationCache, get_translation_cache
+from config.languages import DEFAULT_TARGET_LANGUAGE, is_supported
+from config.settings import Settings, get_settings
+from providers.base import TranslationProvider
+from providers.gemini_provider import GeminiProvider
 
 logger = logging.getLogger(__name__)
 
