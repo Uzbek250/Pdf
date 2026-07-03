@@ -14,7 +14,10 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.routes import router as api_router
+try:
+    from .api.routes import router as api_router
+except ImportError:
+    from api.routes import router as api_router
 from .config.settings import get_settings
 
 settings = get_settings()
