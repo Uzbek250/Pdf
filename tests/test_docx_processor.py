@@ -9,6 +9,7 @@ from docx import Document
 from services.docx_processor import (
     _collect_translatable_paragraphs,
     _distribute_translation_to_runs,
+    _run_contains_drawing,
 )
 
 
@@ -81,3 +82,62 @@ def test_collect_translatable_paragraphs_skips_empty_paragraphs() -> None:
     texts = [ref.original_text for ref in refs]
 
     assert texts == ["Birinchi paragraf", "Ikkinchi paragraf"]
+
+
+def test_distribute_translation_preserves_word_boundaries() -> None:
+    """Tarjima matni run'lar orasiga bo'linganda so'zlar orasidagi
+    bo'shliqlar yo'qolmasligi kerak (masalan "Matnning yangi" ->
+    "Matnningyangi" kabi xatoga yo'l qo'yilmaydi)."""
+    document = Document()
+    paragraph = document.add_paragraph()
+    # Ko'p sonli qisqa run'lar — bu Word imlo tekshiruvi natijasida
+    # ko'pincha yuzaga keladigan holatni simulyatsiya qiladi.
+    paragraph.add_run("Matn")
+    paragraph.add_run("ning")
+    paragraph.add_run(" yangi")
+    paragraph.add_run(" leksik")
+
+    translated = "Text's new lexical"
+    _distribute_translation_to_runs(paragraph, translated)
+
+    combined = "".join(run.text for run in paragraph.runs)
+    # Umumiy matn to'g'ri va HECH QANDAY so'z chegarasi buzilmagan bo'lishi
+    # kerak — ya'ni combined ichida so'zlar orasida bo'shliq saqlanadi.
+    assert combined == translated
+    assert "  " not in combined  # ikki marta bo'shliq ketma-ket kelmasligi kerak
+    # So'zlar orasida bo'shliq yo'qolib, ular qo'shilib ketmagan bo'lishi kerak
+    assert "Text'snew" not in combined
+    assert "newlexical" not in combined
+
+
+def test_distribute_translation_skips_runs_containing_drawing() -> None:
+    """Rasm (drawing) saqlovchi run'lar tarjima paytida tegilmasligi va
+    ularning ichidagi rasm elementi yo'qolmasligi kerak."""
+    document = Document()
+    paragraph = document.add_paragraph()
+    text_run = paragraph.add_run("Original matn")
+
+    # Rasmni simulyatsiya qilish uchun ikkinchi run yaratib, uning XML
+    # elementiga qo'lda soxta <w:drawing> elementini qo'shamiz — bu
+    # haqiqiy rasm run'ining tuzilishini taqlid qiladi.
+    image_run = paragraph.add_run("")
+    drawing_xml = (
+        '<w:drawing xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "</w:drawing>"
+    )
+    from lxml import etree
+
+    drawing_element = etree.fromstring(drawing_xml)
+    image_run._element.append(drawing_element)
+
+    assert _run_contains_drawing(image_run) is True
+    assert _run_contains_drawing(text_run) is False
+
+    _distribute_translation_to_runs(paragraph, "Tarjima qilingan matn")
+
+    # Matn run'i tarjima qilingan bo'lishi kerak
+    assert text_run.text == "Tarjima qilingan matn"
+    # Rasm run'ining matni o'zgarishsiz (bo'sh) qolishi va rasm elementi
+    # hali ham mavjud bo'lishi kerak.
+    assert image_run.text == ""
+    assert _run_contains_drawing(image_run) is True

@@ -18,12 +18,24 @@ MUHIM ARXITEKTURAVIY QOIDA:
     va " world" alohida-alohida tarjima qilinsa noto'g'ri natija chiqadi).
     Shu sababli biz avval paragraf run'larini "matn segmentlariga"
     yig'amiz, BUTUN paragraf matnini tarjima qilamiz, so'ngra tarjima
-    qilingan matnni run'lar orasiga ULARNING NISBIY UZUNLIGIGA mos ravishda
-    qayta taqsimlaymiz — shu orqali formatlash imkon qadar saqlanadi.
+    qilingan matnni run'lar orasiga so'z chegaralarini hurmat qilgan
+    holda qayta taqsimlaymiz — shu orqali formatlash imkon qadar
+    saqlanadi va so'zlar o'rtasidagi bo'shliqlar yo'qolmaydi.
+
+MUHIM: RASMLI RUN'LAR
+    Bitta `Run` obyekti nafaqat oddiy matn, balki inline rasm
+    (`<w:drawing>` yoki eski uslub `<w:pict>` XML elementi) ham bo'lishi
+    mumkin. Agar bunday run'ning `.text` xususiyatiga yozsak,
+    python-docx uning butun XML mazmunini (jumladan rasm elementini ham)
+    o'chirib, faqat oddiy matn bilan almashtiradi — bu rasmni butunlay
+    yo'q qilib yuboradi. Shu sabab biz har bir run'ni tarjima matni bilan
+    to'ldirishdan oldin, u rasm saqlovchi run emasligini tekshiramiz va
+    rasmli run'larni umuman tegmasdan qoldiramiz.
 """
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -36,6 +48,10 @@ from services.translator import TranslatorService
 
 logger = logging.getLogger(__name__)
 
+# Rasm yoki boshqa grafik obyektlarni ifodalovchi XML teglar (namespace
+# prefiksidan qat'iy nazar, shuning uchun `endswith` orqali tekshiramiz).
+_DRAWING_TAG_SUFFIXES = ("}drawing", "}pict", "}object")
+
 
 @dataclass(slots=True)
 class ParagraphRef:
@@ -44,6 +60,19 @@ class ParagraphRef:
     paragraph: Paragraph
     original_text: str
     run_lengths: list[int] = field(default_factory=list)
+
+
+def _run_contains_drawing(run: Run) -> bool:
+    """Berilgan run ichida rasm/chizma (drawing) elementi bormi tekshiradi.
+
+    Bunday run'ning `.text` xususiyatiga yozish uning ichidagi rasmni
+    yo'q qilib yuboradi, shuning uchun bunday run'larni tarjima matnini
+    taqsimlashda umuman chetlab o'tamiz.
+    """
+    for child in run._element.iter():
+        if any(child.tag.endswith(suffix) for suffix in _DRAWING_TAG_SUFFIXES):
+            return True
+    return False
 
 
 def _iter_block_paragraphs(document: Document):
@@ -82,48 +111,104 @@ def _collect_translatable_paragraphs(document: Document) -> list[ParagraphRef]:
     return refs
 
 
+def _split_translated_text_by_word_boundaries(
+    translated_text: str, num_targets: int
+) -> list[str]:
+    """Tarjima matnini so'z chegaralarini hurmat qilgan holda `num_targets`
+    ta segmentga bo'ladi.
+
+    Oddiy nisbiy-uzunlik bo'yicha kesish so'z o'rtasidan kesib, bo'shliqni
+    yo'qotib yuborishi mumkin (masalan "Matnning yangi" -> "Matnningyangi").
+    Bu funksiya avval matnni so'zlarga (bo'shliqni saqlagan holda) ajratadi,
+    so'ng har bir segmentga nisbatan teng miqdorda so'z guruhini beradi —
+    shunda bo'shliqlar hech qachon segment ichida yo'qolmaydi.
+    """
+    if num_targets <= 1:
+        return [translated_text]
+
+    # Bo'shliqlarni ham alohida "token" sifatida saqlab, matnni bo'lakларга
+    # ajratamiz — shunda qayta birlashtirilganda hech narsa yo'qolmaydi.
+    tokens = re.findall(r"\S+|\s+", translated_text)
+    if not tokens:
+        return [""] * num_targets
+
+    total_len = len(translated_text)
+    target_len_per_segment = total_len / num_targets
+
+    segments: list[str] = []
+    current_segment: list[str] = []
+    current_len = 0
+    remaining_targets = num_targets
+
+    for idx, token in enumerate(tokens):
+        current_segment.append(token)
+        current_len += len(token)
+
+        remaining_tokens = tokens[idx + 1 :]
+        is_last_target = remaining_targets == 1
+
+        if is_last_target:
+            # Oxirgi segment — qolgan barcha tokenlarni oladi.
+            continue
+
+        if current_len >= target_len_per_segment and not token.isspace():
+            # So'z chegarasida (bo'shliq emas) to'xtaymiz, shunda so'z
+            # o'rtasidan bo'linmaydi.
+            segments.append("".join(current_segment))
+            current_segment = []
+            current_len = 0
+            remaining_targets -= 1
+            if not remaining_tokens:
+                break
+
+    # Qolgan tokenlarni oxirgi segmentga qo'shamiz.
+    if current_segment:
+        segments.append("".join(current_segment))
+
+    # Yetarli segment hosil bo'lmagan bo'lsa (juda qisqa matn holatida),
+    # bo'sh segmentlar bilan to'ldiramiz.
+    while len(segments) < num_targets:
+        segments.append("")
+
+    # Agar biror sababdan ortiqcha segment hosil bo'lsa (kamdan-kam holat),
+    # ortiqchalarini oxirgisiga birlashtiramiz.
+    if len(segments) > num_targets:
+        extra = "".join(segments[num_targets - 1 :])
+        segments = segments[: num_targets - 1] + [extra]
+
+    return segments
+
+
 def _distribute_translation_to_runs(paragraph: Paragraph, translated_text: str) -> None:
-    """Tarjima qilingan matnni paragraf run'lariga nisbiy uzunlik bo'yicha taqsimlaydi.
+    """Tarjima qilingan matnni paragraf run'lariga so'z chegaralarini hurmat
+    qilgan holda taqsimlaydi.
 
     Format (bold/italic/rang/shrift) run obyektining o'zida saqlanadi —
     biz faqat `run.text` maydonini o'zgartiramiz, run obyektini o'chirmaymiz.
+
+    RASMLI RUN'LAR TEGILMAYDI: agar biror run ichida rasm (drawing/pict
+    elementi) bo'lsa, uning matni umuman o'zgartirilmaydi — aks holda
+    python-docx run matnini yozayotganda run ichidagi rasm elementini ham
+    o'chirib yuboradi.
     """
-    runs: list[Run] = paragraph.runs
-    if not runs:
+    all_runs: list[Run] = paragraph.runs
+    if not all_runs:
         return
 
-    if len(runs) == 1:
-        runs[0].text = translated_text
+    # Rasm saqlovchi run'larni ajratib olamiz — ularga umuman tegilmaydi.
+    text_runs = [run for run in all_runs if not _run_contains_drawing(run)]
+
+    if not text_runs:
+        # Paragrafda faqat rasm(lar) bor, matn run'i yo'q — tegilmaydi.
         return
 
-    original_lengths = [len(run.text) for run in runs]
-    total_original = sum(original_lengths) or 1
-    total_translated = len(translated_text)
+    if len(text_runs) == 1:
+        text_runs[0].text = translated_text
+        return
 
-    # Har bir run'ga tegishli nisbiy uzunlikni hisoblaymiz
-    cursor = 0
-    allocated_lengths: list[int] = []
-    for i, orig_len in enumerate(original_lengths):
-        if i == len(original_lengths) - 1:
-            # Oxirgi run — qolgan hamma narsani oladi (yaxlitlash xatosini yopish uchun)
-            allocated = total_translated - cursor
-        else:
-            ratio = orig_len / total_original
-            allocated = round(total_translated * ratio)
-        allocated = max(allocated, 0)
-        allocated_lengths.append(allocated)
-        cursor += allocated
-
-    # Ehtiyot chorasi: agar yaxlitlash tufayli umumiy uzunlik oshib/kamayib
-    # ketsa, oxirgi elementni tuzatamiz.
-    diff = total_translated - sum(allocated_lengths)
-    if diff != 0 and allocated_lengths:
-        allocated_lengths[-1] = max(allocated_lengths[-1] + diff, 0)
-
-    pos = 0
-    for run, length in zip(runs, allocated_lengths):
-        run.text = translated_text[pos : pos + length]
-        pos += length
+    segments = _split_translated_text_by_word_boundaries(translated_text, len(text_runs))
+    for run, segment in zip(text_runs, segments):
+        run.text = segment
 
 
 def _translate_header_footer(
