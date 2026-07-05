@@ -145,7 +145,7 @@ class GeminiProvider(TranslationProvider):
         if not texts:
             return TranslationResult(translations=[], source_language=source_language)
 
-        from config.languages import get_language
+        from app.config.languages import get_language
 
         target_lang_name = get_language(target_language).name_en
         source_hint = (
@@ -276,7 +276,7 @@ class GeminiProvider(TranslationProvider):
         target_language: str,
         mime_type: str = "image/png",
     ) -> str:
-        from config.languages import get_language
+        from app.config.languages import get_language
 
         target_lang_name = get_language(target_language).name_en
         prompt = _ocr_translate_prompt(target_lang_name)
