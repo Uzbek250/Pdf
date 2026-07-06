@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from docx import Document
+from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
@@ -52,6 +53,19 @@ logger = logging.getLogger(__name__)
 # prefiksidan qat'iy nazar, shuning uchun `endswith` orqali tekshiramiz).
 _DRAWING_TAG_SUFFIXES = ("}drawing", "}pict", "}object")
 
+# Footnote/endnote referens belgilarini (masalan matndagi kichik "¹" raqami)
+# ifodalovchi XML teglar. Bular oddiy matn emas — Word ularni alohida
+# hisoblaydi va avtomatik raqamlaydi. Agar bunday run'ning matnini
+# o'zgartirsak yoki uni "oddiy matn run'i" sifatida hisoblab tarjima
+# taqsimotiga aralashtirsak, footnote belgisi yo'qolishi yoki noto'g'ri
+# joyga tushib qolishi mumkin.
+_FOOTNOTE_REFERENCE_TAG_SUFFIXES = (
+    "}footnoteReference",
+    "}endnoteReference",
+    "}footnoteRef",
+    "}endnoteRef",
+)
+
 
 @dataclass(slots=True)
 class ParagraphRef:
@@ -60,6 +74,40 @@ class ParagraphRef:
     paragraph: Paragraph
     original_text: str
     run_lengths: list[int] = field(default_factory=list)
+
+
+def _get_all_runs_including_hyperlinks(paragraph: Paragraph) -> list[Run]:
+    """Paragrafdagi BARCHA matn run'larini qaytaradi — jumladan
+    `<w:hyperlink>` ichiga joylashgan run'larni ham.
+
+    MUHIM: `paragraph.runs` (python-docx standart xususiyati) faqat
+    paragrafning BEVOSITA farzand elementlarini (`<w:r>`) qaytaradi.
+    Hyperlink matni esa Word'da `<w:hyperlink><w:r>...</w:r></w:hyperlink>`
+    ko'rinishida saqlanadi — bu holda `<w:r>` hyperlink elementining
+    farzandi, paragrafning emas, shuning uchun `paragraph.runs` uni
+    ko'rmaydi.
+
+    Ammo `paragraph.text` (o'qish uchun property) hyperlink matnini
+    AVTOMATIK qo'shib hisoblaydi. Natijada, agar biz tarjima uchun
+    `paragraph.text`dan foydalanib, taqsimlash uchun `paragraph.runs`dan
+    foydalansak, ikkalasi orasida nomuvofiqlik yuzaga keladi — hyperlink
+    matni "yo'qolgandek" yoki noto'g'ri joyga qo'shilib qolgandek
+    ko'rinadi (masalan gap oxiriga yopishib qoladi).
+
+    Bu funksiya paragraf XML daraxtini chuqurroq aylanib chiqib, hyperlink
+    ichidagi run'larni ham asosiy ro'yxatga, ular hujjatda qanday tartibda
+    joylashgan bo'lsa shu tartibda qo'shadi.
+    """
+    runs: list[Run] = []
+    for child in paragraph._element:
+        tag = child.tag
+        if tag == qn("w:r"):
+            runs.append(Run(child, paragraph))
+        elif tag == qn("w:hyperlink"):
+            for grandchild in child:
+                if grandchild.tag == qn("w:r"):
+                    runs.append(Run(grandchild, paragraph))
+    return runs
 
 
 def _run_contains_drawing(run: Run) -> bool:
@@ -71,6 +119,25 @@ def _run_contains_drawing(run: Run) -> bool:
     """
     for child in run._element.iter():
         if any(child.tag.endswith(suffix) for suffix in _DRAWING_TAG_SUFFIXES):
+            return True
+    return False
+
+
+def _run_contains_footnote_reference(run: Run) -> bool:
+    """Berilgan run ichida footnote/endnote referens belgisi bormi tekshiradi.
+
+    Bunday run'lar odatda bo'sh yoki juda qisqa matnga ega (Word ularni
+    o'zi avtomatik raqamlaydi), lekin ular MUHIM strukturaviy elementlar —
+    ularning matnini tarjima taqsimotiga aralashtirish footnote belgisini
+    yo'qotib yuborishi yoki noto'g'ri joyga surib qo'yishi mumkin. Shu
+    sabab bunday run'lar ham, xuddi rasmli run'lar kabi, tarjima matni
+    taqsimlanishidan chetlab o'tiladi.
+    """
+    for child in run._element.iter():
+        if any(
+            child.tag.endswith(suffix)
+            for suffix in _FOOTNOTE_REFERENCE_TAG_SUFFIXES
+        ):
             return True
     return False
 
@@ -101,7 +168,8 @@ def _collect_translatable_paragraphs(document: Document) -> list[ParagraphRef]:
         text = paragraph.text
         if not text or not text.strip():
             continue
-        run_lengths = [len(run.text) for run in paragraph.runs]
+        all_runs = _get_all_runs_including_hyperlinks(paragraph)
+        run_lengths = [len(run.text) for run in all_runs]
         # Agar run'lar umuman bo'lmasa (kamdan-kam, lekin nazariy jihatdan
         # mumkin), paragraph.text'ga tayanamiz va keyin bitta "virtual run"
         # sifatida ko'ramiz.
@@ -109,6 +177,70 @@ def _collect_translatable_paragraphs(document: Document) -> list[ParagraphRef]:
             run_lengths = [len(text)]
         refs.append(ParagraphRef(paragraph=paragraph, original_text=text, run_lengths=run_lengths))
     return refs
+
+
+def _run_format_signature(run: Run) -> tuple:
+    """Run formatlashini solishtirish uchun taqqoslanadigan "imzo" tuzadi.
+
+    Ikkita run bir xil imzoga ega bo'lsa, ular vizual jihatdan bir xil
+    ko'rinadi (bold/italic/underline/shrift/rang/o'lcham bir xil), shuning
+    uchun ularni bitta "samarali run" sifatida birlashtirish xavfsiz —
+    formatlash yo'qolmaydi.
+    """
+    font = run.font
+    color = None
+    if font.color is not None and font.color.type is not None:
+        color = str(font.color.rgb) if font.color.rgb else str(font.color.type)
+    return (
+        run.bold,
+        run.italic,
+        run.underline,
+        font.name,
+        font.size,
+        color,
+        font.strike,
+        font.subscript,
+        font.superscript,
+    )
+
+
+def _group_runs_by_format(runs: list[Run]) -> list[list[Run]]:
+    """Ketma-ket kelgan, bir xil formatga ega run'larni guruhlarga ajratadi.
+
+    MUHIM: bu ba'zi hujjatlarda (masalan skanerlangan yoki eski Word
+    fayllardan konvertatsiya qilingan hujjatlarda) uchraydigan holatni
+    tuzatish uchun kerak — bunday hujjatlarda bitta so'zning o'zi bir
+    necha run'ga bo'linib ketgan bo'lishi mumkin (masalan "организма"
+    so'zi "орга" + "низма" kabi ikkita alohida run sifatida saqlangan,
+    garchi ular orasida hech qanday format farqi bo'lmasa ham).
+
+    Bunday "sun'iy" run bo'linishlarini hisobga olmasdan tarjima matnini
+    run soniga qarab taqsimlasak, tarjima matni ham xuddi shu tasodifiy
+    joylardan kesiladi va so'zlar buzilib qoladi (masalan bo'shliqlar
+    noto'g'ri joyga tushib qoladi).
+
+    Yechim: agar ketma-ket kelgan run'lar bir xil formatga ega bo'lsa,
+    ularni bitta guruh deb hisoblaymiz — tarjima matni shu guruhlar
+    soniga qarab taqsimlanadi, guruh ichidagi run'lardan birortasiga
+    (odatda birinchisiga) yoziladi, qolganlari bo'sh qilinadi. Bu orqali
+    tarjima matni tasodifiy so'z-ichi chegaralarga emas, balki haqiqiy
+    formatlash chegaralariga mos taqsimlanadi.
+    """
+    if not runs:
+        return []
+
+    groups: list[list[Run]] = [[runs[0]]]
+    last_signature = _run_format_signature(runs[0])
+
+    for run in runs[1:]:
+        signature = _run_format_signature(run)
+        if signature == last_signature:
+            groups[-1].append(run)
+        else:
+            groups.append([run])
+            last_signature = signature
+
+    return groups
 
 
 def _split_translated_text_by_word_boundaries(
@@ -180,35 +312,71 @@ def _split_translated_text_by_word_boundaries(
 
 
 def _distribute_translation_to_runs(paragraph: Paragraph, translated_text: str) -> None:
-    """Tarjima qilingan matnni paragraf run'lariga so'z chegaralarini hurmat
-    qilgan holda taqsimlaydi.
+    """Tarjima qilingan matnni paragraf run'lariga taqsimlaydi.
 
-    Format (bold/italic/rang/shrift) run obyektining o'zida saqlanadi —
-    biz faqat `run.text` maydonini o'zgartiramiz, run obyektini o'chirmaymiz.
+    Ikki bosqichli himoya + guruhlash strategiyasi ishlatiladi:
 
-    RASMLI RUN'LAR TEGILMAYDI: agar biror run ichida rasm (drawing/pict
-    elementi) bo'lsa, uning matni umuman o'zgartirilmaydi — aks holda
-    python-docx run matnini yozayotganda run ichidagi rasm elementini ham
-    o'chirib yuboradi.
+    1. RASM va FOOTNOTE REFERENSLARI TEGILMAYDI: bunday run'lar tarjima
+       taqsimotidan butunlay chetlab o'tiladi — ularning matni yozilmaydi,
+       run obyektining o'zi ham o'chirilmaydi. Bu ularning ichidagi maxsus
+       XML elementini (rasm yoki footnote raqami) yo'qotib qo'ymaslik
+       uchun zarur.
+
+    2. FORMATGA QARAB GURUHLASH: qolgan (oddiy matnli) run'lar orasida,
+       ketma-ket kelgan va bir xil formatga (bold/italic/shrift/rang)
+       ega bo'lganlari BITTA guruh sifatida ko'riladi. Bu ba'zi
+       hujjatlarda (masalan eski yoki avtomatik konvertatsiya qilingan
+       fayllarda) uchraydigan "sun'iy" run bo'linishini (bitta so'zning
+       o'zi bir necha run'ga bo'linib ketishi) tuzatadi — aks holda
+       tarjima matni ham xuddi shu tasodifiy joylardan kesilib, so'zlar
+       yoki bo'shliqlar buzilib qolar edi.
+
+    Tarjima matni shu guruhlar soniga qarab taqsimlanadi (so'z
+    chegaralarini hurmat qilgan holda); har bir guruh ichida faqat
+    BIRINCHI run matnni oladi, qolganlari bo'sh qilinadi — bu format
+    xususiyatlarini (guruhning o'zi bir xil formatli bo'lgani uchun)
+    yo'qotmaydi.
     """
-    all_runs: list[Run] = paragraph.runs
+    all_runs: list[Run] = _get_all_runs_including_hyperlinks(paragraph)
     if not all_runs:
         return
 
-    # Rasm saqlovchi run'larni ajratib olamiz — ularga umuman tegilmaydi.
-    text_runs = [run for run in all_runs if not _run_contains_drawing(run)]
+    # 1-bosqich: rasm yoki footnote/endnote referensi saqlovchi run'larni
+    # ajratib olamiz — ularga umuman tegilmaydi.
+    text_runs = [
+        run
+        for run in all_runs
+        if not _run_contains_drawing(run) and not _run_contains_footnote_reference(run)
+    ]
 
     if not text_runs:
-        # Paragrafda faqat rasm(lar) bor, matn run'i yo'q — tegilmaydi.
+        # Paragrafda faqat rasm/footnote bor, oddiy matn run'i yo'q.
         return
 
     if len(text_runs) == 1:
         text_runs[0].text = translated_text
         return
 
-    segments = _split_translated_text_by_word_boundaries(translated_text, len(text_runs))
-    for run, segment in zip(text_runs, segments):
-        run.text = segment
+    # 2-bosqich: bir xil formatli ketma-ket run'larni guruhlaymiz —
+    # shunda tarjima matni "sun'iy" run chegaralariga emas, balki
+    # haqiqiy formatlash chegaralariga mos taqsimlanadi.
+    groups = _group_runs_by_format(text_runs)
+
+    if len(groups) == 1:
+        # Barcha run'lar bir xil formatda — birinchisiga yozamiz,
+        # qolganlarini bo'shatamiz.
+        first_run, *rest_runs = groups[0]
+        first_run.text = translated_text
+        for run in rest_runs:
+            run.text = ""
+        return
+
+    segments = _split_translated_text_by_word_boundaries(translated_text, len(groups))
+    for group, segment in zip(groups, segments):
+        first_run, *rest_runs = group
+        first_run.text = segment
+        for run in rest_runs:
+            run.text = ""
 
 
 def _translate_header_footer(
