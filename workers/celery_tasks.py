@@ -6,16 +6,23 @@ yerdan o'qiydi).
 ARXITEKTURA (asosiy oqim):
     1. PDF -> pdf2docx -> DOCX
     2. DOCX -> run-darajasida tarjima (docx_processor.translate_docx)
-    3. Tarjima qilingan DOCX -> LibreOffice -> yakuniy PDF
 
-    Agar kirish fayli DOCX bo'lsa, 1-qadam o'tkazib yuboriladi va
-    natija ham DOCX formatida qaytariladi (foydalanuvchi PDF chiqishni
-    xohlasa, alohida flag orqali so'raladi — bu yerda soddalik uchun
-    kirish formatiga mos chiqish formatini saqlaymiz).
+    MUHIM QAROR: kirish fayli PDF bo'lsa ham, YAKUNIY natija DOCX
+    formatida qaytariladi — LibreOffice orqali qayta PDF'ga aylantirish
+    bosqichi ATAYLAB OLIB TASHLANGAN. Sabablari:
+      - LibreOffice hosting muhitida (masalan Railway) qo'shimcha
+        bog'liqlik va nosozlik nuqtasi bo'lib, ishonchlilikni pasaytiradi.
+      - Qo'shimcha konvertatsiya bosqichi formatlash sifatini yana bir
+        marta xavf ostiga qo'yadi.
+      - Foydalanuvchi DOCX faylni istalgan ofis dasturida (Word, WPS,
+        Google Docs) ochib, xohlasa o'zi PDF sifatida saqlashi mumkin.
+
+    Agar kirish fayli DOCX bo'lsa, 1-qadam (pdf2docx) o'tkazib yuboriladi.
 
     Skaner PDF uchun: matn qatlami yo'q deb aniqlansa, har bir sahifa
     rasmga aylantiriladi va Gemini vision (OCR + tarjima) orqali
-    to'g'ridan-to'g'ri tarjima qilinadi, so'ng natija PDF'ga yig'iladi.
+    to'g'ridan-to'g'ri tarjima qilinadi, so'ng natija PDF'ga yig'iladi
+    (bu alohida oqim, chunki manba fayl matn qatlamiga ega emas).
 """
 from __future__ import annotations
 
@@ -33,8 +40,6 @@ from celery import Celery
 from config.settings import get_settings
 from services.converter import (
     ConversionError,
-    docx_to_pdf,
-    images_to_pdf,
     is_scanned_pdf,
     pdf_to_docx,
     render_pdf_pages_to_images,
@@ -231,20 +236,20 @@ async def _translate_document_async(
         source_language=source_language,
     )
 
-    if suffix == ".pdf":
-        _update(TaskStatus.CONVERTING_TO_PDF, 80)
-        final_pdf = await docx_to_pdf(translated_docx_path, work_dir)
-        renamed_final = work_dir / f"{Path(original_filename).stem}_translated.pdf"
-        if final_pdf != renamed_final:
-            shutil.move(str(final_pdf), str(renamed_final))
-        output_path = renamed_final
-    else:
-        output_path = translated_docx_path
+    # MUHIM: kirish PDF bo'lgan taqdirda ham, yakuniy natija DOCX
+    # formatida qaytariladi (LibreOffice orqali qayta PDF qilish
+    # ataylab qilinmaydi — sabablar fayl boshidagi docstring'da).
+    output_path = translated_docx_path
 
     _update(
         TaskStatus.COMPLETED,
         100,
-        {"output_path": str(output_path), "source_language": source_language},
+        {
+            "output_path": str(output_path),
+            "source_language": source_language,
+            "output_format": "docx",
+            "was_originally_pdf": suffix == ".pdf",
+        },
     )
     return {"output_path": str(output_path), "source_language": source_language}
 

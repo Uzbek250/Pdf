@@ -53,6 +53,8 @@ class ProgressResponse(BaseModel):
     error: str | None = None
     source_language: str | None = None
     is_scanned: bool | None = None
+    output_format: str | None = None
+    was_originally_pdf: bool | None = None
 
 
 # -------------------------------------------------------------------- #
