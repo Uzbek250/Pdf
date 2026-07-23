@@ -36,6 +36,15 @@ class Settings(BaseSettings):
 
     # ---- Batching ----
     BATCH_PARAGRAPH_SIZE: int = Field(default=20, ge=1, le=100)
+    # Token-based dynamic batching: paragraflar fixed-count o'rniga
+    # taxminiy OUTPUT token budjeti bo'yicha guruhlanadi. Gemini'ning
+    # 64K output limitidan xavfsiz masofada, truncation'ni oldini olish
+    # uchun ~42K atrofida saqlanadi.
+    BATCH_MAX_OUTPUT_TOKENS: int = Field(default=42000, ge=1000)
+    # Bir vaqtda Gemini'ga yuboriladigan parallel batch so'rovlar soni.
+    # Bitta API key bilan ishlaganda ToS/rate-limit xavfini kamaytirish
+    # uchun past qiymatda saqlanadi.
+    BATCH_MAX_CONCURRENCY: int = Field(default=3, ge=1, le=20)
 
     # ---- Til aniqlash ----
     LANGDETECT_CONFIDENCE_THRESHOLD: float = Field(default=0.95, ge=0.0, le=1.0)

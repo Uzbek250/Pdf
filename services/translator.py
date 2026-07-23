@@ -4,6 +4,7 @@ parchalarni batch qilib provayderga yuborish va natijalarni qayta keshlash.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from langdetect import DetectorFactory, detect_langs
@@ -75,6 +76,82 @@ class TranslatorService:
     # ------------------------------------------------------------------ #
     # Batch tarjima (kesh bilan)
     # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        """Matnning taxminiy token sonini baholaydi.
+
+        Aniq tokenizatsiya qilmaydi (bu qo'shimcha bog'liqlik va sekinlik
+        keltiradi); o'rniga ~4 belgi = 1 token taxminidan foydalanadi, bu
+        Gemini kabi modellar uchun amalda yetarlicha yaqin natija beradi.
+        Tarjima natijasi manba matndan uzunroq bo'lishi mumkinligini
+        hisobga olib (masalan o'zbekcha matn inglizchadan uzunroq),
+        xavfsizlik uchun 1.3x zaxira ko'paytmasi qo'llaniladi.
+        """
+        if not text:
+            return 0
+        return int((len(text) / 4) * 1.3)
+
+    def _build_token_batches(
+        self, indices: list[int], paragraphs: list[str]
+    ) -> list[list[int]]:
+        """Kesh-miss bo'lgan paragraf indekslarini taxminiy OUTPUT token
+        budjeti bo'yicha guruhlarga bo'ladi (fixed paragraph count o'rniga).
+
+        Har bir guruh ``BATCH_MAX_OUTPUT_TOKENS`` chegarasidan oshmaslikka
+        harakat qiladi. Yakka o'zi shu chegaradan katta bo'lgan juda uzun
+        bitta paragraf ham hech qachon bo'linmaydi — o'z-o'zidan alohida
+        guruh bo'lib qoladi (provayder xatosi bermasin uchun).
+        """
+        max_tokens = self._settings.BATCH_MAX_OUTPUT_TOKENS
+        batches: list[list[int]] = []
+        current_batch: list[int] = []
+        current_tokens = 0
+
+        for idx in indices:
+            para_tokens = self._estimate_tokens(paragraphs[idx])
+
+            if current_batch and current_tokens + para_tokens > max_tokens:
+                batches.append(current_batch)
+                current_batch = []
+                current_tokens = 0
+
+            current_batch.append(idx)
+            current_tokens += para_tokens
+
+        if current_batch:
+            batches.append(current_batch)
+
+        return batches
+
+    async def _translate_one_batch(
+        self,
+        batch_indices: list[int],
+        paragraphs: list[str],
+        target_language: str,
+        source_language: str | None,
+        semaphore: asyncio.Semaphore,
+    ) -> list[tuple[int, str]]:
+        """Bitta batch'ni tarjima qiladi va (index, tarjima) juftliklarini qaytaradi.
+
+        Semaphore orqali bir vaqtdagi so'rovlar soni ``BATCH_MAX_CONCURRENCY``
+        bilan cheklanadi — provayderning mavjud retry/backoff mexanizmi
+        (429 va boshqa xatolar uchun) ishlatiladi va bu yerda qayta
+        amalga oshirilmaydi.
+        """
+        batch_texts = [paragraphs[i] for i in batch_indices]
+        async with semaphore:
+            result = await self._provider.translate_batch(
+                texts=batch_texts,
+                target_language=target_language,
+                source_language=source_language,
+            )
+
+        pairs: list[tuple[int, str]] = []
+        for idx, translation in zip(batch_indices, result.translations):
+            pairs.append((idx, translation))
+        return pairs
+
     async def translate_paragraphs(
         self,
         paragraphs: list[str],
@@ -86,9 +163,12 @@ class TranslatorService:
         Oqim:
         1. Bo'sh/faqat bo'shliqdan iborat parchalar tarjimasiz o'tkaziladi.
         2. Har bir nobo'sh parcha uchun kesh tekshiriladi.
-        3. Kesh-miss bo'lgan parchalar `BATCH_PARAGRAPH_SIZE` o'lchamdagi
-           guruhlarga bo'linib, provayderga yuboriladi.
-        4. Yangi tarjimalar keshga yoziladi va yakuniy natija tartib
+        3. Kesh-miss bo'lgan parchalar taxminiy OUTPUT token budjeti
+           (`BATCH_MAX_OUTPUT_TOKENS`) bo'yicha dinamik guruhlarga bo'linadi
+           — fixed paragraph-count o'rniga.
+        4. Guruhlar bir vaqtning o'zida, `BATCH_MAX_CONCURRENCY` bilan
+           cheklangan parallel so'rovlar sifatida provayderga yuboriladi.
+        5. Yangi tarjimalar keshga yoziladi va yakuniy natija tartib
            bo'yicha qayta yig'iladi.
         """
         if not paragraphs:
@@ -111,21 +191,32 @@ class TranslatorService:
             else:
                 indices_to_translate.append(idx)
 
-        # Kesh-miss bo'lgan indexlarni batch'larga bo'lamiz
-        batch_size = self._settings.BATCH_PARAGRAPH_SIZE
-        for start in range(0, len(indices_to_translate), batch_size):
-            batch_indices = indices_to_translate[start : start + batch_size]
-            batch_texts = [paragraphs[i] for i in batch_indices]
+        # Kesh-miss bo'lgan indekslarni token-budjeti bo'yicha dinamik
+        # guruhlarga bo'lamiz (fixed BATCH_PARAGRAPH_SIZE o'rniga)
+        token_batches = self._build_token_batches(indices_to_translate, paragraphs)
 
-            result = await self._provider.translate_batch(
-                texts=batch_texts,
-                target_language=target_language,
-                source_language=source_language,
-            )
+        if token_batches:
+            semaphore = asyncio.Semaphore(self._settings.BATCH_MAX_CONCURRENCY)
+            tasks = [
+                self._translate_one_batch(
+                    batch_indices=batch_indices,
+                    paragraphs=paragraphs,
+                    target_language=target_language,
+                    source_language=source_language,
+                    semaphore=semaphore,
+                )
+                for batch_indices in token_batches
+            ]
 
-            for idx, translation in zip(batch_indices, result.translations):
-                final_results[idx] = translation
-                await self._cache.set(target_language, paragraphs[idx], translation)
+            # Guruhlar parallel yuboriladi; tugash tartibi farqli bo'lishi
+            # mumkin, lekin har bir natija o'z asl indeksi bilan qaytadi,
+            # shuning uchun yakuniy tartib buzilmaydi.
+            batch_results = await asyncio.gather(*tasks)
+
+            for pairs in batch_results:
+                for idx, translation in pairs:
+                    final_results[idx] = translation
+                    await self._cache.set(target_language, paragraphs[idx], translation)
 
         # Barcha elementlar to'ldirilgan bo'lishi kerak
         return [r if r is not None else "" for r in final_results]
