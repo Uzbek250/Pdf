@@ -162,14 +162,15 @@ class TranslatorService:
 
         Oqim:
         1. Bo'sh/faqat bo'shliqdan iborat parchalar tarjimasiz o'tkaziladi.
-        2. Har bir nobo'sh parcha uchun kesh tekshiriladi.
+        2. Qolgan barcha parchalar uchun kesh BITTA pipeline (MGET)
+           so'rovida tekshiriladi (`get_many`) — har biri alohida emas.
         3. Kesh-miss bo'lgan parchalar taxminiy OUTPUT token budjeti
            (`BATCH_MAX_OUTPUT_TOKENS`) bo'yicha dinamik guruhlarga bo'linadi
            — fixed paragraph-count o'rniga.
         4. Guruhlar bir vaqtning o'zida, `BATCH_MAX_CONCURRENCY` bilan
            cheklangan parallel so'rovlar sifatida provayderga yuboriladi.
-        5. Yangi tarjimalar keshga yoziladi va yakuniy natija tartib
-           bo'yicha qayta yig'iladi.
+        5. Yangi tarjimalar BITTA pipeline so'rovida (`set_many`) keshga
+           yoziladi va yakuniy natija tartib bo'yicha qayta yig'iladi.
         """
         if not paragraphs:
             return []
@@ -178,16 +179,25 @@ class TranslatorService:
             raise ValueError(f"Qo'llab-quvvatlanmaydigan maqsad til: {target_language}")
 
         final_results: list[str | None] = [None] * len(paragraphs)
-        indices_to_translate: list[int] = []
+        nonempty_indices: list[int] = []
 
         for idx, para in enumerate(paragraphs):
             if not para.strip():
                 final_results[idx] = para  # bo'sh joy — o'zgarishsiz
-                continue
+            else:
+                nonempty_indices.append(idx)
 
-            cached = await self._cache.get(target_language, para)
-            if cached is not None:
-                final_results[idx] = cached
+        # Kesh tekshiruvi — BITTA pipeline (MGET) so'rovida, bittalab emas
+        nonempty_texts = [paragraphs[i] for i in nonempty_indices]
+        cache_hits = await self._cache.get_many(
+            target_language, nonempty_texts, source_lang=source_language
+        )
+        # cache_hits kalitlari nonempty_texts ichidagi pozitsiya (0..N-1);
+        # buni asl paragraf indeksiga moslashtiramiz
+        indices_to_translate: list[int] = []
+        for pos, idx in enumerate(nonempty_indices):
+            if pos in cache_hits:
+                final_results[idx] = cache_hits[pos]
             else:
                 indices_to_translate.append(idx)
 
@@ -213,10 +223,16 @@ class TranslatorService:
             # shuning uchun yakuniy tartib buzilmaydi.
             batch_results = await asyncio.gather(*tasks)
 
+            new_translations: list[tuple[str, str]] = []
             for pairs in batch_results:
                 for idx, translation in pairs:
                     final_results[idx] = translation
-                    await self._cache.set(target_language, paragraphs[idx], translation)
+                    new_translations.append((paragraphs[idx], translation))
+
+            # Yangi tarjimalarni BITTA pipeline so'rovida keshga yozamiz
+            await self._cache.set_many(
+                target_language, new_translations, source_lang=source_language
+            )
 
         # Barcha elementlar to'ldirilgan bo'lishi kerak
         return [r if r is not None else "" for r in final_results]
