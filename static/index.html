@@ -245,234 +245,180 @@
 <script>
 const API = "/api";
 
-const LANG_NAMES = {
-  uz: "O'zbekcha", ru: "Русский", en: "English", tr: "Türkçe",
-  kk: "Қазақша", de: "Deutsch", ko: "한국어", ar: "العربية",
-  fa: "فارسی", tg: "Тоҷикӣ", ky: "Кыргызча", fr: "Français",
-};
-
 const STRINGS = {
   uz: {
-    title: "📄 Hujjat Tarjimon",
-    dropZone: "PDF yoki DOCX faylni shu yerga tashlang<br>yoki bosib tanlang",
-    invalidFile: "Faqat PDF yoki DOCX fayllar qabul qilinadi.",
-    langLabel: "Tarjima tili",
-    translateBtn: "Tarjima qilish",
-    uploading: "Yuklanmoqda...",
-    uploadError: "Yuklashda xatolik: ",
-    stageStart: "Boshlanmoqda...",
+    title: "📄 Hujjat Tarjimon", dropZone: "PDF yoki DOCX faylni shu yerga tashlang<br>yoki bosib tanlang",
+    invalidFile: "Faqat PDF yoki DOCX fayllar qabul qilinadi.", langLabel: "Tarjima tili",
+    translateBtn: "Tarjima qilish", uploading: "Yuklanmoqda...", uploadError: "Yuklashda xatolik: ",
     connError: "Ulanishda uzilish yuz berdi. Sahifani yangilab qayta urinib ko'ring.",
-    success: "✅ Tarjima muvaffaqiyatli yakunlandi.",
-    done: "Tayyor!",
-    failPrefix: "❌ Xatolik: ",
-    failDefault: "Tarjima amalga oshmadi.",
-    downloadBtn: "Tarjima qilingan faylni yuklab olish",
-    restartBtn: "Yangi fayl tarjima qilish",
-    langsFailed: "Tillarni yuklab bo'lmadi",
+    success: "✅ Tarjima muvaffaqiyatli yakunlandi.", done: "Tayyor!", failPrefix: "❌ Xatolik: ",
+    failDefault: "Tarjima amalga oshmadi.", downloadBtn: "Tarjima qilingan faylni yuklab olish",
+    restartBtn: "Yangi fayl tarjima qilish", langsFailed: "Tillarni yuklab bo'lmadi",
+    stage_pending: "Navbatga qo'yildi...", stage_detecting_language: "Fayl tili aniqlanmoqda...",
+    stage_converting_to_docx: "Fayl DOCX formatiga o'girilmoqda...", stage_ocr_scanned_pages: "Skanerlangan sahifalar o'qilmoqda (OCR)...",
+    stage_translating: "Matn tarjima qilinmoqda...", stage_converting_to_pdf: "Fayl formatlanmoqda...",
   },
   ru: {
-    title: "📄 Переводчик документов",
-    dropZone: "Перетащите PDF или DOCX сюда<br>или нажмите для выбора",
-    invalidFile: "Принимаются только файлы PDF или DOCX.",
-    langLabel: "Язык перевода",
-    translateBtn: "Перевести",
-    uploading: "Загрузка...",
-    uploadError: "Ошибка загрузки: ",
-    stageStart: "Начинается...",
+    title: "📄 Переводчик документов", dropZone: "Перетащите PDF или DOCX сюда<br>или нажмите для выбора",
+    invalidFile: "Принимаются только файлы PDF или DOCX.", langLabel: "Язык перевода",
+    translateBtn: "Перевести", uploading: "Загрузка...", uploadError: "Ошибка загрузки: ",
     connError: "Соединение прервано. Обновите страницу и попробуйте снова.",
-    success: "✅ Перевод успешно завершён.",
-    done: "Готово!",
-    failPrefix: "❌ Ошибка: ",
-    failDefault: "Не удалось выполнить перевод.",
-    downloadBtn: "Скачать переведённый файл",
-    restartBtn: "Перевести другой файл",
-    langsFailed: "Не удалось загрузить языки",
+    success: "✅ Перевод успешно завершён.", done: "Готово!", failPrefix: "❌ Ошибка: ",
+    failDefault: "Не удалось выполнить перевод.", downloadBtn: "Скачать переведённый файл",
+    restartBtn: "Перевести другой файл", langsFailed: "Не удалось загрузить языки",
+    stage_pending: "В очереди...", stage_detecting_language: "Определяется язык файла...",
+    stage_converting_to_docx: "Файл конвертируется в DOCX...", stage_ocr_scanned_pages: "Считываются отсканированные страницы (OCR)...",
+    stage_translating: "Текст переводится...", stage_converting_to_pdf: "Файл форматируется...",
   },
   en: {
-    title: "📄 Document Translator",
-    dropZone: "Drop a PDF or DOCX file here<br>or click to select",
-    invalidFile: "Only PDF or DOCX files are accepted.",
-    langLabel: "Translation language",
-    translateBtn: "Translate",
-    uploading: "Uploading...",
-    uploadError: "Upload error: ",
-    stageStart: "Starting...",
+    title: "📄 Document Translator", dropZone: "Drop a PDF or DOCX file here<br>or click to select",
+    invalidFile: "Only PDF or DOCX files are accepted.", langLabel: "Translation language",
+    translateBtn: "Translate", uploading: "Uploading...", uploadError: "Upload error: ",
     connError: "Connection lost. Refresh the page and try again.",
-    success: "✅ Translation completed successfully.",
-    done: "Done!",
-    failPrefix: "❌ Error: ",
-    failDefault: "Translation failed.",
-    downloadBtn: "Download translated file",
-    restartBtn: "Translate another file",
-    langsFailed: "Could not load languages",
+    success: "✅ Translation completed successfully.", done: "Done!", failPrefix: "❌ Error: ",
+    failDefault: "Translation failed.", downloadBtn: "Download translated file",
+    restartBtn: "Translate another file", langsFailed: "Could not load languages",
+    stage_pending: "Queued...", stage_detecting_language: "Detecting file language...",
+    stage_converting_to_docx: "Converting file to DOCX...", stage_ocr_scanned_pages: "Reading scanned pages (OCR)...",
+    stage_translating: "Translating text...", stage_converting_to_pdf: "Formatting file...",
   },
   tr: {
-    title: "📄 Belge Çevirmeni",
-    dropZone: "PDF veya DOCX dosyasını buraya bırakın<br>veya seçmek için tıklayın",
-    invalidFile: "Yalnızca PDF veya DOCX dosyaları kabul edilir.",
-    langLabel: "Çeviri dili",
-    translateBtn: "Çevir",
-    uploading: "Yükleniyor...",
-    uploadError: "Yükleme hatası: ",
-    stageStart: "Başlıyor...",
+    title: "📄 Belge Çevirmeni", dropZone: "PDF veya DOCX dosyasını buraya bırakın<br>veya seçmek için tıklayın",
+    invalidFile: "Yalnızca PDF veya DOCX dosyaları kabul edilir.", langLabel: "Çeviri dili",
+    translateBtn: "Çevir", uploading: "Yükleniyor...", uploadError: "Yükleme hatası: ",
     connError: "Bağlantı kesildi. Sayfayı yenileyip tekrar deneyin.",
-    success: "✅ Çeviri başarıyla tamamlandı.",
-    done: "Tamamlandı!",
-    failPrefix: "❌ Hata: ",
-    failDefault: "Çeviri başarısız oldu.",
-    downloadBtn: "Çevrilen dosyayı indir",
-    restartBtn: "Başka bir dosya çevir",
-    langsFailed: "Diller yüklenemedi",
+    success: "✅ Çeviri başarıyla tamamlandı.", done: "Tamamlandı!", failPrefix: "❌ Hata: ",
+    failDefault: "Çeviri başarısız oldu.", downloadBtn: "Çevrilen dosyayı indir",
+    restartBtn: "Başka bir dosya çevir", langsFailed: "Diller yüklenemedi",
+    stage_pending: "Sırada...", stage_detecting_language: "Dosya dili tespit ediliyor...",
+    stage_converting_to_docx: "Dosya DOCX'e dönüştürülüyor...", stage_ocr_scanned_pages: "Taranmış sayfalar okunuyor (OCR)...",
+    stage_translating: "Metin çevriliyor...", stage_converting_to_pdf: "Dosya biçimlendiriliyor...",
   },
   kk: {
-    title: "📄 Құжат аудармашысы",
-    dropZone: "PDF немесе DOCX файлын осында тастаңыз<br>немесе таңдау үшін басыңыз",
-    invalidFile: "Тек PDF немесе DOCX файлдары қабылданады.",
-    langLabel: "Аударма тілі",
-    translateBtn: "Аудару",
-    uploading: "Жүктелуде...",
-    uploadError: "Жүктеу қатесі: ",
-    stageStart: "Басталуда...",
+    title: "📄 Құжат аудармашысы", dropZone: "PDF немесе DOCX файлын осында тастаңыз<br>немесе таңдау үшін басыңыз",
+    invalidFile: "Тек PDF немесе DOCX файлдары қабылданады.", langLabel: "Аударма тілі",
+    translateBtn: "Аудару", uploading: "Жүктелуде...", uploadError: "Жүктеу қатесі: ",
     connError: "Байланыс үзілді. Бетті жаңартып, қайта көріңіз.",
-    success: "✅ Аударма сәтті аяқталды.",
-    done: "Дайын!",
-    failPrefix: "❌ Қате: ",
-    failDefault: "Аударма сәтсіз аяқталды.",
-    downloadBtn: "Аударылған файлды жүктеу",
-    restartBtn: "Басқа файлды аудару",
-    langsFailed: "Тілдерді жүктеу мүмкін болмады",
+    success: "✅ Аударма сәтті аяқталды.", done: "Дайын!", failPrefix: "❌ Қате: ",
+    failDefault: "Аударма сәтсіз аяқталды.", downloadBtn: "Аударылған файлды жүктеу",
+    restartBtn: "Басқа файлды аудару", langsFailed: "Тілдерді жүктеу мүмкін болмады",
+    stage_pending: "Кезекте...", stage_detecting_language: "Файл тілі анықталуда...",
+    stage_converting_to_docx: "Файл DOCX форматына түрлендірілуде...", stage_ocr_scanned_pages: "Сканерленген беттер оқылуда (OCR)...",
+    stage_translating: "Мәтін аударылуда...", stage_converting_to_pdf: "Файл пішімделуде...",
   },
   de: {
-    title: "📄 Dokumentübersetzer",
-    dropZone: "PDF- oder DOCX-Datei hierher ziehen<br>oder klicken zum Auswählen",
-    invalidFile: "Nur PDF- oder DOCX-Dateien werden akzeptiert.",
-    langLabel: "Übersetzungssprache",
-    translateBtn: "Übersetzen",
-    uploading: "Wird hochgeladen...",
-    uploadError: "Upload-Fehler: ",
-    stageStart: "Startet...",
+    title: "📄 Dokumentübersetzer", dropZone: "PDF- oder DOCX-Datei hierher ziehen<br>oder klicken zum Auswählen",
+    invalidFile: "Nur PDF- oder DOCX-Dateien werden akzeptiert.", langLabel: "Übersetzungssprache",
+    translateBtn: "Übersetzen", uploading: "Wird hochgeladen...", uploadError: "Upload-Fehler: ",
     connError: "Verbindung verloren. Seite aktualisieren und erneut versuchen.",
-    success: "✅ Übersetzung erfolgreich abgeschlossen.",
-    done: "Fertig!",
-    failPrefix: "❌ Fehler: ",
-    failDefault: "Übersetzung fehlgeschlagen.",
-    downloadBtn: "Übersetzte Datei herunterladen",
-    restartBtn: "Weitere Datei übersetzen",
-    langsFailed: "Sprachen konnten nicht geladen werden",
+    success: "✅ Übersetzung erfolgreich abgeschlossen.", done: "Fertig!", failPrefix: "❌ Fehler: ",
+    failDefault: "Übersetzung fehlgeschlagen.", downloadBtn: "Übersetzte Datei herunterladen",
+    restartBtn: "Weitere Datei übersetzen", langsFailed: "Sprachen konnten nicht geladen werden",
+    stage_pending: "In der Warteschlange...", stage_detecting_language: "Dateisprache wird erkannt...",
+    stage_converting_to_docx: "Datei wird in DOCX konvertiert...", stage_ocr_scanned_pages: "Gescannte Seiten werden gelesen (OCR)...",
+    stage_translating: "Text wird übersetzt...", stage_converting_to_pdf: "Datei wird formatiert...",
   },
   ko: {
-    title: "📄 문서 번역기",
-    dropZone: "PDF 또는 DOCX 파일을 여기에 놓거나<br>클릭하여 선택하세요",
-    invalidFile: "PDF 또는 DOCX 파일만 허용됩니다.",
-    langLabel: "번역 언어",
-    translateBtn: "번역하기",
-    uploading: "업로드 중...",
-    uploadError: "업로드 오류: ",
-    stageStart: "시작 중...",
+    title: "📄 문서 번역기", dropZone: "PDF 또는 DOCX 파일을 여기에 놓거나<br>클릭하여 선택하세요",
+    invalidFile: "PDF 또는 DOCX 파일만 허용됩니다.", langLabel: "번역 언어",
+    translateBtn: "번역하기", uploading: "업로드 중...", uploadError: "업로드 오류: ",
     connError: "연결이 끊어졌습니다. 새로고침 후 다시 시도하세요.",
-    success: "✅ 번역이 완료되었습니다.",
-    done: "완료!",
-    failPrefix: "❌ 오류: ",
-    failDefault: "번역에 실패했습니다.",
-    downloadBtn: "번역된 파일 다운로드",
-    restartBtn: "다른 파일 번역하기",
-    langsFailed: "언어를 불러올 수 없습니다",
+    success: "✅ 번역이 완료되었습니다.", done: "완료!", failPrefix: "❌ 오류: ",
+    failDefault: "번역에 실패했습니다.", downloadBtn: "번역된 파일 다운로드",
+    restartBtn: "다른 파일 번역하기", langsFailed: "언어를 불러올 수 없습니다",
+    stage_pending: "대기 중...", stage_detecting_language: "파일 언어 감지 중...",
+    stage_converting_to_docx: "DOCX로 변환 중...", stage_ocr_scanned_pages: "스캔된 페이지 읽는 중 (OCR)...",
+    stage_translating: "텍스트 번역 중...", stage_converting_to_pdf: "파일 서식 지정 중...",
   },
   ar: {
-    title: "📄 مترجم المستندات",
-    dropZone: "أفلت ملف PDF أو DOCX هنا<br>أو انقر للاختيار",
-    invalidFile: "يُقبل فقط ملفات PDF أو DOCX.",
-    langLabel: "لغة الترجمة",
-    translateBtn: "ترجم",
-    uploading: "جاري الرفع...",
-    uploadError: "خطأ في الرفع: ",
-    stageStart: "جاري البدء...",
+    title: "📄 مترجم المستندات", dropZone: "أفلت ملف PDF أو DOCX هنا<br>أو انقر للاختيار",
+    invalidFile: "يُقبل فقط ملفات PDF أو DOCX.", langLabel: "لغة الترجمة",
+    translateBtn: "ترجم", uploading: "جاري الرفع...", uploadError: "خطأ في الرفع: ",
     connError: "انقطع الاتصال. حدّث الصفحة وحاول مرة أخرى.",
-    success: "✅ اكتملت الترجمة بنجاح.",
-    done: "تم!",
-    failPrefix: "❌ خطأ: ",
-    failDefault: "فشلت الترجمة.",
-    downloadBtn: "تنزيل الملف المترجم",
-    restartBtn: "ترجمة ملف آخر",
-    langsFailed: "تعذر تحميل اللغات",
+    success: "✅ اكتملت الترجمة بنجاح.", done: "تم!", failPrefix: "❌ خطأ: ",
+    failDefault: "فشلت الترجمة.", downloadBtn: "تنزيل الملف المترجم",
+    restartBtn: "ترجمة ملف آخر", langsFailed: "تعذر تحميل اللغات",
+    stage_pending: "في الانتظار...", stage_detecting_language: "يتم اكتشاف لغة الملف...",
+    stage_converting_to_docx: "يتم التحويل إلى DOCX...", stage_ocr_scanned_pages: "تتم قراءة الصفحات الممسوحة (OCR)...",
+    stage_translating: "جاري ترجمة النص...", stage_converting_to_pdf: "يتم تنسيق الملف...",
   },
   fa: {
-    title: "📄 مترجم اسناد",
-    dropZone: "فایل PDF یا DOCX را اینجا رها کنید<br>یا برای انتخاب کلیک کنید",
-    invalidFile: "فقط فایل‌های PDF یا DOCX پذیرفته می‌شوند.",
-    langLabel: "زبان ترجمه",
-    translateBtn: "ترجمه کن",
-    uploading: "در حال آپلود...",
-    uploadError: "خطای آپلود: ",
-    stageStart: "در حال شروع...",
+    title: "📄 مترجم اسناد", dropZone: "فایل PDF یا DOCX را اینجا رها کنید<br>یا برای انتخاب کلیک کنید",
+    invalidFile: "فقط فایل‌های PDF یا DOCX پذیرفته می‌شوند.", langLabel: "زبان ترجمه",
+    translateBtn: "ترجمه کن", uploading: "در حال آپلود...", uploadError: "خطای آپلود: ",
     connError: "اتصال قطع شد. صفحه را بازخوانی کرده و دوباره امتحان کنید.",
-    success: "✅ ترجمه با موفقیت انجام شد.",
-    done: "انجام شد!",
-    failPrefix: "❌ خطا: ",
-    failDefault: "ترجمه ناموفق بود.",
-    downloadBtn: "دانلود فایل ترجمه‌شده",
-    restartBtn: "ترجمه فایل دیگر",
-    langsFailed: "بارگذاری زبان‌ها ممکن نشد",
+    success: "✅ ترجمه با موفقیت انجام شد.", done: "انجام شد!", failPrefix: "❌ خطا: ",
+    failDefault: "ترجمه ناموفق بود.", downloadBtn: "دانلود فایل ترجمه‌شده",
+    restartBtn: "ترجمه فایل دیگر", langsFailed: "بارگذاری زبان‌ها ممکن نشد",
+    stage_pending: "در صف انتظار...", stage_detecting_language: "زبان فایل تشخیص داده می‌شود...",
+    stage_converting_to_docx: "فایل به DOCX تبدیل می‌شود...", stage_ocr_scanned_pages: "صفحات اسکن‌شده خوانده می‌شوند (OCR)...",
+    stage_translating: "متن در حال ترجمه است...", stage_converting_to_pdf: "فایل قالب‌بندی می‌شود...",
   },
   tg: {
-    title: "📄 Тарҷумони ҳуҷҷат",
-    dropZone: "Файли PDF ё DOCX-ро ба ин ҷо гузоред<br>ё барои интихоб клик кунед",
-    invalidFile: "Танҳо файлҳои PDF ё DOCX қабул карда мешаванд.",
-    langLabel: "Забони тарҷума",
-    translateBtn: "Тарҷума кардан",
-    uploading: "Бор карда истодааст...",
-    uploadError: "Хатои боркунӣ: ",
-    stageStart: "Оғоз ёфта истодааст...",
+    title: "📄 Тарҷумони ҳуҷҷат", dropZone: "Файли PDF ё DOCX-ро ба ин ҷо гузоред<br>ё барои интихоб клик кунед",
+    invalidFile: "Танҳо файлҳои PDF ё DOCX қабул карда мешаванд.", langLabel: "Забони тарҷума",
+    translateBtn: "Тарҷума кардан", uploading: "Бор карда истодааст...", uploadError: "Хатои боркунӣ: ",
     connError: "Пайваст қатъ шуд. Саҳифаро нав кунед ва аз нав кӯшиш кунед.",
-    success: "✅ Тарҷума бомуваффақият анҷом ёфт.",
-    done: "Тайёр!",
-    failPrefix: "❌ Хато: ",
-    failDefault: "Тарҷума ноком шуд.",
-    downloadBtn: "Файли тарҷумашударо боргирӣ кунед",
-    restartBtn: "Файли дигарро тарҷума кунед",
-    langsFailed: "Забонҳоро бор кардан имконнопазир аст",
+    success: "✅ Тарҷума бомуваффақият анҷом ёфт.", done: "Тайёр!", failPrefix: "❌ Хато: ",
+    failDefault: "Тарҷума ноком шуд.", downloadBtn: "Файли тарҷумашударо боргирӣ кунед",
+    restartBtn: "Файли дигарро тарҷума кунед", langsFailed: "Забонҳоро бор кардан имконнопазир аст",
+    stage_pending: "Дар навбат...", stage_detecting_language: "Забони файл муайян карда мешавад...",
+    stage_converting_to_docx: "Файл ба DOCX табдил ёфта истодааст...", stage_ocr_scanned_pages: "Саҳифаҳои сканшуда хонда мешаванд (OCR)...",
+    stage_translating: "Матн тарҷума карда мешавад...", stage_converting_to_pdf: "Файл форматбандӣ мешавад...",
   },
   ky: {
-    title: "📄 Документ котормочусу",
-    dropZone: "PDF же DOCX файлын бул жерге таштаңыз<br>же тандоо үчүн басыңыз",
-    invalidFile: "Оолой PDF же DOCX файлдары кабыл алынат.",
-    langLabel: "Котормо тили",
-    translateBtn: "Которуу",
-    uploading: "Жүктөлүүдө...",
-    uploadError: "Жүктөө катасы: ",
-    stageStart: "Башталууда...",
+    title: "📄 Документ котормочусу", dropZone: "PDF же DOCX файлын бул жерге таштаңыз<br>же тандоо үчүн басыңыз",
+    invalidFile: "Оолой PDF же DOCX файлдары кабыл алынат.", langLabel: "Котормо тили",
+    translateBtn: "Которуу", uploading: "Жүктөлүүдө...", uploadError: "Жүктөө катасы: ",
     connError: "Байланыш үзүлдү. Баракты жаңыртып, кайра аракет кылыңыз.",
-    success: "✅ Котормо ийгиликтүү аяктады.",
-    done: "Даяр!",
-    failPrefix: "❌ Ката: ",
-    failDefault: "Котормо ишке ашкан жок.",
-    downloadBtn: "Которулган файлды жүктөп алуу",
-    restartBtn: "Башка файлды которуу",
-    langsFailed: "Тилдерди жүктөп болбоду",
+    success: "✅ Котормо ийгиликтүү аяктады.", done: "Даяр!", failPrefix: "❌ Ката: ",
+    failDefault: "Котормо ишке ашкан жок.", downloadBtn: "Которулган файлды жүктөп алуу",
+    restartBtn: "Башка файлды которуу", langsFailed: "Тилдерди жүктөп болбоду",
+    stage_pending: "Кезекте...", stage_detecting_language: "Файлдын тили аныкталууда...",
+    stage_converting_to_docx: "Файл DOCXке айландырылууда...", stage_ocr_scanned_pages: "Сканерленген барактар окулууда (OCR)...",
+    stage_translating: "Текст которулууда...", stage_converting_to_pdf: "Файл форматтоо жүрүп жатат...",
   },
   fr: {
-    title: "📄 Traducteur de documents",
-    dropZone: "Déposez un fichier PDF ou DOCX ici<br>ou cliquez pour sélectionner",
-    invalidFile: "Seuls les fichiers PDF ou DOCX sont acceptés.",
-    langLabel: "Langue de traduction",
-    translateBtn: "Traduire",
-    uploading: "Téléchargement...",
-    uploadError: "Erreur de téléchargement : ",
-    stageStart: "Démarrage...",
+    title: "📄 Traducteur de documents", dropZone: "Déposez un fichier PDF ou DOCX ici<br>ou cliquez pour sélectionner",
+    invalidFile: "Seuls les fichiers PDF ou DOCX sont acceptés.", langLabel: "Langue de traduction",
+    translateBtn: "Traduire", uploading: "Téléchargement...", uploadError: "Erreur de téléchargement : ",
     connError: "Connexion perdue. Actualisez la page et réessayez.",
-    success: "✅ Traduction terminée avec succès.",
-    done: "Terminé !",
-    failPrefix: "❌ Erreur : ",
-    failDefault: "Échec de la traduction.",
-    downloadBtn: "Télécharger le fichier traduit",
-    restartBtn: "Traduire un autre fichier",
-    langsFailed: "Impossible de charger les langues",
+    success: "✅ Traduction terminée avec succès.", done: "Terminé !", failPrefix: "❌ Erreur : ",
+    failDefault: "Échec de la traduction.", downloadBtn: "Télécharger le fichier traduit",
+    restartBtn: "Traduire un autre fichier", langsFailed: "Impossible de charger les langues",
+    stage_pending: "En file d'attente...", stage_detecting_language: "Détection de la langue du fichier...",
+    stage_converting_to_docx: "Conversion du fichier en DOCX...", stage_ocr_scanned_pages: "Lecture des pages numérisées (OCR)...",
+    stage_translating: "Traduction du texte...", stage_converting_to_pdf: "Mise en forme du fichier...",
+  },
+  es: {
+    title: "📄 Traductor de documentos", dropZone: "Suelta un archivo PDF o DOCX aquí<br>o haz clic para seleccionar",
+    invalidFile: "Solo se aceptan archivos PDF o DOCX.", langLabel: "Idioma de traducción",
+    translateBtn: "Traducir", uploading: "Subiendo...", uploadError: "Error de carga: ",
+    connError: "Conexión perdida. Actualiza la página e inténtalo de nuevo.",
+    success: "✅ Traducción completada con éxito.", done: "¡Listo!", failPrefix: "❌ Error: ",
+    failDefault: "La traducción falló.", downloadBtn: "Descargar archivo traducido",
+    restartBtn: "Traducir otro archivo", langsFailed: "No se pudieron cargar los idiomas",
+    stage_pending: "En cola...", stage_detecting_language: "Detectando el idioma del archivo...",
+    stage_converting_to_docx: "Convirtiendo archivo a DOCX...", stage_ocr_scanned_pages: "Leyendo páginas escaneadas (OCR)...",
+    stage_translating: "Traduciendo texto...", stage_converting_to_pdf: "Dando formato al archivo...",
+  },
+  zh: {
+    title: "📄 文档翻译器", dropZone: "将 PDF 或 DOCX 文件拖到此处<br>或点击选择",
+    invalidFile: "仅接受 PDF 或 DOCX 文件。", langLabel: "翻译语言",
+    translateBtn: "翻译", uploading: "上传中...", uploadError: "上传错误：",
+    connError: "连接已断开。请刷新页面重试。",
+    success: "✅ 翻译已成功完成。", done: "完成！", failPrefix: "❌ 错误：",
+    failDefault: "翻译失败。", downloadBtn: "下载翻译后的文件",
+    restartBtn: "翻译另一个文件", langsFailed: "无法加载语言列表",
+    stage_pending: "排队中...", stage_detecting_language: "正在检测文件语言...",
+    stage_converting_to_docx: "正在转换为 DOCX...", stage_ocr_scanned_pages: "正在读取扫描页面 (OCR)...",
+    stage_translating: "正在翻译文本...", stage_converting_to_pdf: "正在格式化文件...",
   },
 };
 
 function t(key) {
   const lang = langSelect.value || "uz";
-  return (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.uz[key];
+  return (STRINGS[lang] && STRINGS[lang][key]) || (STRINGS.uz[key]) || key;
 }
 
 function applyUiLanguage() {
@@ -486,7 +432,7 @@ function applyUiLanguage() {
   document.getElementById("translateBtn").textContent = t("translateBtn");
   document.getElementById("downloadBtnText").textContent = t("downloadBtn");
   document.getElementById("restartBtn").textContent = t("restartBtn");
-  document.getElementById("progressStage").textContent = t("stageStart");
+  document.getElementById("progressStage").textContent = t("stage_pending");
 }
 
 const dropZone = document.getElementById("dropZone");
@@ -515,10 +461,10 @@ async function loadLanguages() {
     const langs = await res.json();
     langSelect.innerHTML = "";
     langs.forEach(l => {
-      const code = l.code || l.lang || l.value;
+      const code = l.code;
       const opt = document.createElement("option");
       opt.value = code;
-      opt.textContent = LANG_NAMES[code] || l.name || l.label || code;
+      opt.textContent = l.name_native || l.name_en || code;
       langSelect.appendChild(opt);
     });
     applyUiLanguage();
@@ -594,6 +540,14 @@ translateBtn.addEventListener("click", async () => {
   }
 });
 
+function stageLabel(status) {
+  const key = "stage_" + status;
+  const lang = langSelect.value || "uz";
+  if (STRINGS[lang] && STRINGS[lang][key]) return STRINGS[lang][key];
+  if (STRINGS.uz[key]) return STRINGS.uz[key];
+  return status;
+}
+
 function startProgressTracking(taskId) {
   uploadCard.style.display = "none";
   progressCard.classList.add("active");
@@ -601,6 +555,9 @@ function startProgressTracking(taskId) {
   statusMsg.className = "status-msg";
   downloadBtn.classList.remove("active");
   restartBtn.classList.remove("active");
+  progressStage.textContent = t("stage_pending");
+  progressFill.style.width = "0%";
+  progressPercent.textContent = "0%";
 
   currentEventSource = new EventSource(`${API}/progress/${taskId}`);
 
@@ -622,10 +579,9 @@ function startProgressTracking(taskId) {
 }
 
 function updateProgress(data, taskId) {
-  const percent = Math.round((data.progress || 0) * (data.progress <= 1 ? 100 : 1));
-  progressFill.style.width = `${Math.min(percent, 100)}%`;
-  progressPercent.textContent = `${Math.min(percent, 100)}%`;
-  progressStage.textContent = data.stage || data.message || t("stageStart");
+  const percent = Math.max(0, Math.min(100, Math.round(data.progress || 0)));
+  progressFill.style.width = `${percent}%`;
+  progressPercent.textContent = `${percent}%`;
 
   if (data.status === "completed") {
     currentEventSource.close();
@@ -639,9 +595,11 @@ function updateProgress(data, taskId) {
     restartBtn.classList.add("active");
   } else if (data.status === "failed") {
     currentEventSource.close();
-    statusMsg.textContent = t("failPrefix") + (data.error || data.message || t("failDefault"));
+    statusMsg.textContent = t("failPrefix") + (data.error || t("failDefault"));
     statusMsg.className = "status-msg error";
     restartBtn.classList.add("active");
+  } else {
+    progressStage.textContent = stageLabel(data.status);
   }
 }
 
