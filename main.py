@@ -65,6 +65,11 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
+from fastapi.staticfiles import StaticFiles
+
+app.mount("/app", StaticFiles(directory="static", html=True), name="static")
+
+
 # Bitta konteyner ichida FastAPI bilan bir qatorda ishlaydigan Celery worker
 # subprocess'ining ma'lumotnomasi (referensi). Modul darajasida saqlanadi,
 # shunda shutdown paytida uni to'xtatish mumkin.
