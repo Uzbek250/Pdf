@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import random
+import re
 from typing import Any
 
 from google import genai
@@ -61,6 +62,9 @@ to'liq o'qib chiqing. Faqat matnni qaytaring, hech qanday izoh yoki \
 tavsif qo'shmang. Paragraflar orasidagi bo'shliqlarni saqlang.
 """
 
+_JSON_PARSE_RETRIES = 2
+_JSON_PARSE_RETRY_DELAY_SECONDS = 2.5
+
 
 def _ocr_translate_prompt(target_language_name: str) -> str:
     return (
@@ -70,6 +74,14 @@ def _ocr_translate_prompt(target_language_name: str) -> str:
         f"original matn yoki Markdown formatlash qo'shmang. Original "
         f"paragraf tuzilishini (bo'sh qatorlar bilan) saqlang."
     )
+
+
+class _JsonBatchParseError(TranslationProviderError):
+    """Gemini javobining JSON batch sifatida parse qilinishi muvaffaqiyatsiz bo'ldi."""
+
+    def __init__(self, message: str, raw_text: str) -> None:
+        super().__init__(message)
+        self.raw_text = raw_text
 
 
 class GeminiProvider(TranslationProvider):
@@ -173,8 +185,41 @@ class GeminiProvider(TranslationProvider):
                 ),
             )
 
-        response = await self._call_with_retry(_call)
-        translations = self._parse_json_array_response(response.text, expected_len=len(texts))
+        last_parse_error: _JsonBatchParseError | None = None
+        for parse_attempt in range(_JSON_PARSE_RETRIES + 1):
+            response = await self._call_with_retry(_call)
+            raw_text = response.text or ""
+            try:
+                translations = self._parse_json_array_response(
+                    raw_text, expected_len=len(texts)
+                )
+                break
+            except _JsonBatchParseError as exc:
+                last_parse_error = exc
+                if parse_attempt >= _JSON_PARSE_RETRIES:
+                    logger.error(
+                        "Gemini batch JSON parse failed after %s retries. "
+                        "error_type=%s error=%s raw_response=%r",
+                        _JSON_PARSE_RETRIES,
+                        type(exc).__name__,
+                        exc,
+                        exc.raw_text,
+                    )
+                    raise
+
+                logger.warning(
+                    "Gemini batch JSON parse failed (attempt %s/%s, "
+                    "error_type=%s error=%s). Retrying in %.1f seconds.",
+                    parse_attempt + 1,
+                    _JSON_PARSE_RETRIES + 1,
+                    type(exc).__name__,
+                    exc,
+                    _JSON_PARSE_RETRY_DELAY_SECONDS,
+                )
+                await asyncio.sleep(_JSON_PARSE_RETRY_DELAY_SECONDS)
+        else:  # pragma: no cover - defensive guard
+            assert last_parse_error is not None
+            raise last_parse_error
 
         return TranslationResult(
             translations=translations,
@@ -184,37 +229,59 @@ class GeminiProvider(TranslationProvider):
 
     @staticmethod
     def _parse_json_array_response(raw_text: str | None, expected_len: int) -> list[str]:
-        """Gemini javobini xavfsiz JSON massivga aylantiradi.
+        """Gemini javobini JSON massivga aylantiradi.
 
-        Model ba'zan ```json qatorlari bilan o'rab qaytarishi mumkin —
-        shuni tozalab olamiz.
+        Gemini ba'zan Markdown code fence, tushuntirish matni yoki JSON
+        massividan keyingi qo'shimcha matn bilan javob berishi mumkin.
+        JSONDecoder.raw_decode() yordamida haqiqiy massivni ajratib olamiz.
         """
         if raw_text is None:
-            raise TranslationProviderError("Gemini bo'sh javob qaytardi.")
+            raise _JsonBatchParseError("Gemini bo'sh javob qaytardi.", "")
 
         cleaned = raw_text.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.strip("`")
-            if cleaned.lower().startswith("json"):
-                cleaned = cleaned[4:]
-            cleaned = cleaned.strip()
+        fence_match = re.search(r"```(?:json)?\s*(.*?)```", cleaned, flags=re.IGNORECASE | re.DOTALL)
+        if fence_match:
+            cleaned = fence_match.group(1).strip()
 
-        try:
-            parsed: Any = json.loads(cleaned)
-        except json.JSONDecodeError as exc:
-            raise TranslationProviderError(
-                f"Gemini javobini JSON sifatida o'qib bo'lmadi: {exc}"
-            ) from exc
+        decoder = json.JSONDecoder()
+        last_json_error: json.JSONDecodeError | None = None
+        parsed: Any = None
+
+        # Proza oldidan kelgan JSON, ```json bloklari va JSON'dan keyingi
+        # "Extra data" kabi matnlarni ham qo'llab-quvvatlash uchun massivni
+        # topilgan har bir '[' pozitsiyasidan raw_decode qilib ko'ramiz.
+        for index, char in enumerate(cleaned):
+            if char != "[":
+                continue
+            try:
+                candidate, _end = decoder.raw_decode(cleaned, index)
+            except json.JSONDecodeError as exc:
+                last_json_error = exc
+                continue
+            if isinstance(candidate, list):
+                parsed = candidate
+                break
+
+        if parsed is None:
+            if last_json_error is None:
+                last_json_error = json.JSONDecodeError(
+                    "Gemini javobida JSON massivi topilmadi", cleaned, 0
+                )
+            raise _JsonBatchParseError(
+                f"Gemini javobini JSON sifatida o'qib bo'lmadi: {last_json_error}",
+                raw_text,
+            ) from last_json_error
 
         if not isinstance(parsed, list):
-            raise TranslationProviderError(
-                f"Gemini javobi JSON massiv emas: {type(parsed)}"
+            raise _JsonBatchParseError(
+                f"Gemini javobi JSON massiv emas: {type(parsed)}", raw_text
             )
 
         if len(parsed) != expected_len:
-            raise TranslationProviderError(
+            raise _JsonBatchParseError(
                 f"Gemini {expected_len} ta parcha kutilgan edi, "
-                f"{len(parsed)} ta qaytardi."
+                f"{len(parsed)} ta qaytardi.",
+                raw_text,
             )
 
         return [str(item) for item in parsed]
