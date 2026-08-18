@@ -31,9 +31,11 @@ import logging
 import os
 import subprocess
 import sys
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from api.routes import router as api_router
 from config.settings import get_settings
@@ -45,29 +47,6 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-app = FastAPI(
-    title=settings.APP_NAME,
-    description=(
-        "PDF va DOCX fayllarni original formatini saqlab tarjima qiluvchi API. "
-        "Provider: Google Gemini (gemini-2.5-flash, free tier)."
-    ),
-    version="1.0.0",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(api_router, prefix=settings.API_PREFIX)
-
-from fastapi.staticfiles import StaticFiles
-
-app.mount("/app", StaticFiles(directory="static", html=True), name="static")
 
 
 # Bitta konteyner ichida FastAPI bilan bir qatorda ishlaydigan Celery worker
@@ -124,8 +103,10 @@ def _stop_embedded_celery_worker() -> None:
             _celery_worker_process.kill()
 
 
-@app.on_event("startup")
-async def on_startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup/shutdown logikasi (eskirgan @app.on_event o'rniga)."""
+    # --- Startup ---
     settings.ensure_work_dir()
     logger.info("%s ishga tushdi. WORK_DIR=%s", settings.APP_NAME, settings.WORK_DIR)
 
@@ -139,10 +120,33 @@ async def on_startup() -> None:
             "deb hisoblanadi."
         )
 
+    yield
 
-@app.on_event("shutdown")
-async def on_shutdown() -> None:
+    # --- Shutdown ---
     _stop_embedded_celery_worker()
+
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    description=(
+        "PDF va DOCX fayllarni original formatini saqlab tarjima qiluvchi API. "
+        "Provider: Google Gemini (gemini-2.5-flash, free tier)."
+    ),
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router, prefix=settings.API_PREFIX)
+
+app.mount("/app", StaticFiles(directory="static", html=True), name="static")
 
 
 @app.get("/health", tags=["health"])

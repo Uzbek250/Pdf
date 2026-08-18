@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Environment — HECH QACHON commit qilmang (API kalitlar!)
+.env
+
+# Test / lint
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Ishchi fayllar (yuklangan/natija PDF-DOCX)
+work/
+tmp/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Arxiv artefaktlar
+*.zip

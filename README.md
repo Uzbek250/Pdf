@@ -24,7 +24,6 @@ Skaner PDF → sahifalarni rasmga aylantirish → Gemini vision (OCR+tarjima)
 ## O'rnatish
 
 ```bash
-cd app
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
@@ -45,11 +44,15 @@ sudo apt-get install libreoffice redis-server
 redis-server
 
 # Terminal 2: Celery worker
-celery -A app.workers.celery_tasks.celery_app worker --loglevel=info
+celery -A workers.celery_tasks.celery_app worker --loglevel=info
 
 # Terminal 3: FastAPI server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+> **Eslatma**: Railway kabi single-service muhitda `main.py` Celery worker'ni
+> avtomatik subprocess sifatida ishga tushiradi — bu holatda 2-terminal
+> kerak emas. `ENABLE_EMBEDDED_CELERY_WORKER=false` bilan o'chirish mumkin.
 
 API hujjatlari: http://localhost:8000/docs
 
@@ -62,11 +65,11 @@ API hujjatlari: http://localhost:8000/docs
 | GET    | `/api/download/{task_id}`   | Tayyor faylni yuklab olish            |
 | GET    | `/api/languages`             | Qo'llab-quvvatlanadigan tillar       |
 | POST   | `/api/detect-lang`           | Matn namunasi tilini aniqlash        |
+| GET    | `/health`                    | Health-check                          |
 
 ## Testlash
 
 ```bash
-cd app
 python3 -m pytest tests/ -v
 ```
 
